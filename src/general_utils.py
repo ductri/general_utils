@@ -2,19 +2,13 @@ import functools
 import requests
 from contextlib import nullcontext
 import contextlib
-from vllm.distributed import (destroy_distributed_environment,
-                                      destroy_model_parallel)
 import gc
-import torch
 
+import torch
 import wandb
-import ray
 import hydra
 from omegaconf import OmegaConf, DictConfig
 import matplotlib.pyplot as plt
-import torch
-from torch import Tensor
-import transformers
 from numerize.numerize import numerize
 
 
@@ -86,29 +80,29 @@ def retrieve_config(entity, project, exp_id):
     return config
 
 
-def create_ray_wrapper(main_func, num_cpus=15, num_gpus=1):
-    """
-    main_func(conf)
-    """
-    @ray.remote(num_cpus=num_cpus, num_gpus=num_gpus)
-    def ray_wrapper(conf):
-            main_func(conf)
-
-    def my_wrapper(conf):
-        if 'ray' in conf.keys() and conf.ray.enabled:
-            ray.init(address=conf.ray.address)
-            out = ray.get(ray_wrapper.remote(conf))
-        else:
-            print('-- Running without RAY')
-            out = main_func(conf)
-        return out
-
-    return my_wrapper
-
-
+# def create_ray_wrapper(main_func, num_cpus=15, num_gpus=1):
+#     """
+#     main_func(conf)
+#     """
+#     @ray.remote(num_cpus=num_cpus, num_gpus=num_gpus)
+#     def ray_wrapper(conf):
+#             main_func(conf)
+#
+#     def my_wrapper(conf):
+#         if 'ray' in conf.keys() and conf.ray.enabled:
+#             ray.init(address=conf.ray.address)
+#             out = ray.get(ray_wrapper.remote(conf))
+#         else:
+#             print('-- Running without RAY')
+#             out = main_func(conf)
+#         return out
+#
+#     return my_wrapper
 
 
-def plot_distribution(x: Tensor, title: str) -> plt.Figure:
+
+
+def plot_distribution(x: torch.Tensor, title: str) -> plt.Figure:
     x = x.detach().cpu()
     fig, axes = plt.subplots(2, 1, constrained_layout=True)
     axes = axes.flatten()
@@ -149,6 +143,7 @@ def my_generation(model, tokenizer, texts, max_input_length=8, num_return_sequen
 
 
 def load_tokenizer(tokenizer_name_or_path, model_name_or_path, cache_dir):
+    import transformers
     tokenizer_name_or_path = tokenizer_name_or_path or model_name_or_path
     tokenizer = transformers.AutoTokenizer.from_pretrained(tokenizer_name_or_path,\
             cache_dir=cache_dir)
@@ -175,6 +170,9 @@ def model_summary(model: torch.nn.Module):
 
 
 def destroy_vllm_model(vllm_model):
+
+    from vllm.distributed import (destroy_distributed_environment,
+                                      destroy_model_parallel)
     # destroy_model_parallel()
     # del vllm_model
     # gc.collect()

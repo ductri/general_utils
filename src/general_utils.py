@@ -12,6 +12,37 @@ import matplotlib.pyplot as plt
 from numerize.numerize import numerize
 
 
+def wandb_wrapper(prefix=''):
+    """
+    main_func(conf, unique_name)
+    """
+    def wrap_it_outer(main_func):
+        functools.wraps(main_func)
+        def wrap_it(conf, *args, **kwargs):
+            project_name = conf.wandb.project
+
+            # Not a clean solution
+            conf_dict = OmegaConf.to_container(conf, resolve=True)
+            if 'run_id' in conf.keys() and conf.run_id != "":
+                training_config = retrieve_config(conf.wandb.entity, project_name, conf.run_id)
+                conf_dict['training_config'] = training_config
+            conf = OmegaConf.create(conf_dict)
+            if 'wandb' in conf.keys() and conf.wandb.enabled:
+                context = wandb.init(entity=conf.wandb.entity, project=project_name, config=conf_dict)
+                context.name = str(prefix) + str(context.name)
+                unique_name = context.name
+            else:
+                context = nullcontext()
+                unique_name = 'a_unique_name'
+            with context:
+                out = main_func(conf, unique_name, *args, **kwargs)
+                if 'notify_slack' in conf.wandb.keys() and conf.wandb.notify_slack:
+                    context.alert(title="Task done", text=f"Run {unique_name} done!")
+            return out
+        return wrap_it
+    return wrap_it_outer
+
+
 
 def create_wandb_wrapper(main_func, prefix=''):
     """
@@ -80,6 +111,25 @@ def retrieve_config(entity, project, exp_id):
     return config
 
 
+def print_config(func):
+    @functools.wraps(func)
+    def wrap_it(conf: DictConfig, *args, **kwargs):
+        print(OmegaConf.to_yaml(conf))
+        return func(conf, *args, **kwargs)
+    return wrap_it
+
+
+def my_decorator(func):
+    def wrapper():
+        print("Something is happening before the function is called.")
+        func()
+        print("Something is happening after the function is called.")
+    return wrapper
+
+# def say_whee():
+#     print("Whee!")
+#
+# say_whee = decorator(say_whee)
 # def create_ray_wrapper(main_func, num_cpus=15, num_gpus=1):
 #     """
 #     main_func(conf)

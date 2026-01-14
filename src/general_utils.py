@@ -3,10 +3,13 @@ import requests
 from contextlib import nullcontext
 import contextlib
 import gc
+import sys
+import os
 
 import torch
 import wandb
 import hydra
+from hydra.core.hydra_config import HydraConfig
 from omegaconf import OmegaConf, DictConfig
 import matplotlib.pyplot as plt
 from numerize.numerize import numerize
@@ -26,6 +29,12 @@ def wandb_wrapper(prefix=''):
             if 'run_id' in conf.keys() and conf.run_id != "":
                 training_config = retrieve_config(conf.wandb.entity, project_name, conf.run_id)
                 conf_dict['training_config'] = training_config
+
+            script_name = os.path.basename(sys.argv[0])
+            hc = HydraConfig.get()
+            overrides = hc.overrides.task
+            print(f"Command line overrides for this run: {script_name} {' '.join(overrides)}")
+
             conf = OmegaConf.create(conf_dict)
             if 'wandb' in conf.keys() and conf.wandb.enabled:
                 context = wandb.init(entity=conf.wandb.entity, project=project_name, config=conf_dict)
